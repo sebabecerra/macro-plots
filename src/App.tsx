@@ -163,9 +163,11 @@ export default function App() {
       <section className="panel methodology-card">
         <div className="methodology-inline">
           <div className="methodology-topline">
-            <span className="methodology-chip">Methodology:</span>
-            <div className="methodology-controls">
+            <div className="methodology-meta">
+              <span className="methodology-chip">Methodology:</span>
               <span className="generated-at">Updated {generatedAt}</span>
+            </div>
+            <div className="methodology-controls">
               <button className="button subtle" onClick={() => void loadData(true)} disabled={isRefreshing}>
                 {isRefreshing ? "Updating..." : "Update"}
               </button>
@@ -183,8 +185,25 @@ export default function App() {
             {" "}denotes the observed asset price on trading day <InlineMath math={"d"} />, and{" "}
             <InlineMath math={"P(y,1)"} /> denotes the first valid trading observation of year <InlineMath math={"y"} />.
           </span>
-          <div className="formula-inline methodology-formula methodology-formula-break">
-            YTD(y, d) = 100 * (P(y, d) / P(y, 1) - 1)
+          <div className="formula-inline methodology-formula methodology-formula-break" aria-label="YTD formula">
+            <span className="formula-roman">YTD</span>
+            <span>(</span>
+            <span className="formula-var">y</span>
+            <span>, </span>
+            <span className="formula-var">d</span>
+            <span>) = 100 </span>
+            <span className="formula-group">(</span>
+            <span className="formula-symbol">P</span>
+            <span>(</span>
+            <span className="formula-var">y</span>
+            <span>, </span>
+            <span className="formula-var">d</span>
+            <span>) / </span>
+            <span className="formula-symbol">P</span>
+            <span>(</span>
+            <span className="formula-var">y</span>
+            <span>, 1) - 1</span>
+            <span className="formula-group">)</span>
           </div>
         </div>
       </section>
