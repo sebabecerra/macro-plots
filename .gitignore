@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# local raw/source artifacts not needed in most commits
+DCOILWTICO.txt
+plotly-2.35.2.min.js
