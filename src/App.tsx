@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { InlineMath } from "react-katex";
+import { BlockMath, InlineMath } from "react-katex";
 import CommodityChart from "./components/CommodityChart";
 import type { CommodityDataset, CommoditiesPayload } from "./types";
 
@@ -144,7 +144,7 @@ export default function App() {
             <InlineMath math={"P(y,1)"} /> denotes the first valid trading observation of year <InlineMath math={"y"} />.
           </span>
           <span className="formula-inline methodology-formula methodology-formula-break">
-            <InlineMath math={"\\mathrm{YTD}(y,d)=100\\,(P(y,d)/P(y,1)-1)"} />
+            <BlockMath math={"\\text{YTD}(y,d) = 100\\left(\\frac{P(y,d)}{P(y,1)} - 1\\right)"} />
           </span>
         </div>
       </section>
