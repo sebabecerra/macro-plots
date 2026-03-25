@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BlockMath, InlineMath } from "react-katex";
+import { InlineMath } from "react-katex";
 import CommodityChart from "./components/CommodityChart";
 import type { CommodityDataset, CommoditiesPayload } from "./types";
 
@@ -97,15 +97,39 @@ function ChartSection({ dataset }: { dataset: CommodityDataset }) {
 
 export default function App() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadData = async (forceRefresh = false) => {
+    if (state.status === "ready") {
+      setIsRefreshing(true);
+    }
+
+    try {
+      const url = new URL(withBaseUrl("data/commodities.json"), window.location.origin);
+      if (forceRefresh) {
+        url.searchParams.set("t", String(Date.now()));
+      }
+
+      const response = await fetch(url.toString(), {
+        cache: forceRefresh ? "no-store" : "default",
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json() as CommoditiesPayload;
+      setState({ status: "ready", data });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setState({ status: "error", message });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    fetch(withBaseUrl("data/commodities.json"))
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<CommoditiesPayload>;
-      })
-      .then((data) => setState({ status: "ready", data }))
-      .catch((error: Error) => setState({ status: "error", message: error.message }));
+    void loadData();
   }, []);
 
   if (state.status === "loading") {
@@ -125,12 +149,28 @@ export default function App() {
   }
 
   const { oil, gold, sp500 } = state.data;
+  const generatedAt = new Date(state.data.generatedAt).toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
 
   return (
     <main className="app-shell">
       <section className="panel methodology-card">
         <div className="methodology-inline">
-          <span className="methodology-chip">Methodology:</span>
+          <div className="methodology-topline">
+            <span className="methodology-chip">Methodology:</span>
+            <div className="methodology-controls">
+              <span className="generated-at">Updated {generatedAt}</span>
+              <button className="button subtle" onClick={() => void loadData(true)} disabled={isRefreshing}>
+                {isRefreshing ? "Updating..." : "Update"}
+              </button>
+            </div>
+          </div>
           <span className="methodology-copy">
             each line represents one calendar year. Here, “normalized” means that the first valid trading observation of
             the year is used as the common base level, so every subsequent point is shown as the cumulative percentage
@@ -143,9 +183,11 @@ export default function App() {
             {" "}denotes the observed asset price on trading day <InlineMath math={"d"} />, and{" "}
             <InlineMath math={"P(y,1)"} /> denotes the first valid trading observation of year <InlineMath math={"y"} />.
           </span>
-          <span className="formula-inline methodology-formula methodology-formula-break">
-            <BlockMath math={"\\text{YTD}(y,d) = 100\\left(\\frac{P(y,d)}{P(y,1)} - 1\\right)"} />
-          </span>
+          <div className="formula-inline methodology-formula methodology-formula-break">
+            <span>YTD(</span><InlineMath math={"y"} /><span>,</span><InlineMath math={"d"} />
+            <span>) = 100 (</span><InlineMath math={"P(y,d)"} /><span> / </span><InlineMath math={"P(y,1)"} />
+            <span> - 1)</span>
+          </div>
         </div>
       </section>
       <section className="chart-grid">
