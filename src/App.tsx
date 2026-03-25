@@ -184,9 +184,7 @@ export default function App() {
             <InlineMath math={"P(y,1)"} /> denotes the first valid trading observation of year <InlineMath math={"y"} />.
           </span>
           <div className="formula-inline methodology-formula methodology-formula-break">
-            <span>YTD(</span><InlineMath math={"y"} /><span>,</span><InlineMath math={"d"} />
-            <span>) = 100 (</span><InlineMath math={"P(y,d)"} /><span> / </span><InlineMath math={"P(y,1)"} />
-            <span> - 1)</span>
+            YTD(y, d) = 100 * (P(y, d) / P(y, 1) - 1)
           </div>
         </div>
       </section>
