@@ -9,6 +9,7 @@ import {
   TooltipComponent,
 } from "echarts/components";
 import { init, use } from "echarts/core";
+import type { EChartsType } from "echarts/core";
 import type { CommodityDataset } from "../types";
 
 use([
@@ -45,7 +46,7 @@ export default function CommodityChart({ dataset, accent }: Props) {
   useEffect(() => {
     if (!ref.current) return;
 
-    const chart = init(ref.current, undefined, { renderer: "canvas" });
+    const chart: EChartsType = init(ref.current, undefined, { renderer: "canvas" });
     const currentYear = dataset.summary.currentYear;
     let lastMouseY = 0;
     const option: EChartsOption = {

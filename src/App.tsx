@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { InlineMath } from "react-katex";
+import { toBlob } from "html-to-image";
 import CommodityChart from "./components/CommodityChart";
 import type { CommodityDataset, CommoditiesPayload } from "./types";
 
-type LoadState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; data: CommoditiesPayload };
+type Locale = "en" | "es";
 
 const accents = {
   oil: "#ffd166",
@@ -14,6 +12,72 @@ const accents = {
   sp500: "#ffd166",
   ipsa: "#ffd166",
 };
+
+const localizedDatasets = {
+  en: {
+    oil: { name: "WTI Crude Oil", unit: "USD per barrel" },
+    gold: { name: "Gold Futures", unit: "USD per troy ounce" },
+    sp500: { name: "S&P 500", unit: "Index level" },
+    ipsa: { name: "S&P IPSA", unit: "Index level" },
+  },
+  es: {
+    oil: { name: "Petroleo WTI", unit: "USD por barril" },
+    gold: { name: "Futuros del oro", unit: "USD por onza troy" },
+    sp500: { name: "S&P 500", unit: "Nivel del indice" },
+    ipsa: { name: "S&P IPSA", unit: "Nivel del indice" },
+  },
+} as const;
+
+const copy = {
+  en: {
+    loading: "Loading dashboard...",
+    loadErrorLead: "Could not load the generated dataset. Run",
+    loadErrorTail: "if you need to regenerate it, then start the Vite server.",
+    error: "Error",
+    methodology: "Methodology:",
+    updated: "Updated",
+    reload: "Reload dataset",
+    reloading: "Reloading...",
+    reloadFailed: "Reload failed. Showing the last generated dataset.",
+    currentYtd: "YTD",
+    asOf: "As of",
+    high: "High",
+    low: "Low",
+    rawData: "Raw data",
+    normalizedCsv: "Normalized CSV",
+    source: "Source",
+    coverage: "Coverage",
+    language: "Language",
+    methodologyText: "each line represents one calendar year. Here, “normalized” means that the first valid trading observation of the year is used as the common base level, so every subsequent point is shown as the cumulative percentage change relative to that starting value rather than as an absolute price. The x-axis is trading-day count, not calendar date, so the observation on day 40 of one year is directly comparable with day 40 of any other year. The colored line is the current year, while the grey lines represent the empirical distribution of prior-year paths, allowing current performance to be evaluated against the historical range of rallies and drawdowns observed at the same stage of the annual cycle. In the formula,",
+    methodologyTextTail: "denotes the observed asset price on trading day",
+    methodologyTextTail2: "and",
+    methodologyTextTail3: "denotes the first valid trading observation of year",
+  },
+  es: {
+    loading: "Cargando dashboard...",
+    loadErrorLead: "No se pudo cargar el dataset generado. Ejecuta",
+    loadErrorTail: "si necesitas regenerarlo y luego inicia el servidor de Vite.",
+    error: "Error",
+    methodology: "Metodologia:",
+    updated: "Actualizado",
+    reload: "Recargar dataset",
+    reloading: "Recargando...",
+    reloadFailed: "La recarga fallo. Se muestra el ultimo dataset generado.",
+    currentYtd: "YTD",
+    asOf: "Al",
+    high: "Maximo",
+    low: "Minimo",
+    rawData: "Datos raw",
+    normalizedCsv: "CSV normalizado",
+    source: "Fuente",
+    coverage: "Cobertura",
+    language: "Idioma",
+    methodologyText: "cada linea representa un ano calendario. Aqui, “normalizado” significa que la primera observacion valida del ano se usa como nivel base comun, de modo que cada punto posterior se muestra como el cambio porcentual acumulado respecto de ese valor inicial y no como un precio absoluto. El eje x usa conteo de dias de trading, no fecha calendario, por lo que la observacion del dia 40 de un ano es comparable directamente con el dia 40 de cualquier otro ano. La linea destacada corresponde al ano actual, mientras que las lineas grises representan la distribucion empirica de trayectorias de anos previos, permitiendo evaluar el desempeno actual contra el rango historico de rallies y drawdowns observados en esta misma etapa del ciclo anual. En la formula,",
+    methodologyTextTail: "denota el precio observado del activo en el dia de trading",
+    methodologyTextTail2: "y",
+    methodologyTextTail3: "denota la primera observacion valida del ano",
+  },
+} as const;
 
 function withBaseUrl(path: string) {
   const base = import.meta.env.BASE_URL.endsWith("/")
@@ -27,8 +91,8 @@ function formatPct(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
-function formatDate(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+function formatDate(date: string, locale: Locale) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(locale === "es" ? "es-CL" : "en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -52,34 +116,63 @@ function downloadNormalizedCsv(dataset: CommodityDataset) {
   URL.revokeObjectURL(url);
 }
 
-function ChartSection({ dataset }: { dataset: CommodityDataset }) {
+async function downloadCardPng(node: HTMLElement, filename: string) {
+  const blob = await toBlob(node, {
+    cacheBust: true,
+    pixelRatio: 2,
+    backgroundColor: "#050505",
+  });
+
+  if (!blob) {
+    throw new Error("Could not render the chart card as an image.");
+  }
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function ChartSection({ dataset, locale }: { dataset: CommodityDataset; locale: Locale }) {
+  const cardRef = useRef<HTMLElement | null>(null);
   const accent = accents[dataset.key];
   const summary = dataset.summary;
+  const labels = copy[locale];
+  const datasetLabels = localizedDatasets[locale][dataset.key];
   const currentValue = formatPct(summary.currentChangePct);
   const recordHigh = formatPct(summary.recordHigh?.changePct);
   const recordLow = formatPct(summary.recordLow?.changePct);
-  const currentDate = formatDate(summary.currentDate);
+  const currentDate = formatDate(summary.currentDate, locale);
+  const handleDownloadCard = async () => {
+    if (!cardRef.current) return;
+    await downloadCardPng(cardRef.current, `${dataset.key}-ytd-card.png`);
+  };
 
   return (
-    <section className="panel section-card">
+    <section className="panel section-card" ref={cardRef}>
       <div className="section-header">
         <div className="section-heading">
-          <div className="section-kicker">{dataset.name}</div>
-          <h2>{dataset.name}</h2>
-          <p>{dataset.unit}</p>
+          <div className="section-kicker">{datasetLabels.name}</div>
+          <h2>{datasetLabels.name}</h2>
+          <p>{datasetLabels.unit}</p>
         </div>
         <div className="section-statline">
-          <span>{summary.currentYear} YTD <strong>{currentValue}</strong></span>
-          <span>As of {currentDate}</span>
-          <span>High {recordHigh}</span>
-          <span>Low {recordLow}</span>
+          <span>{summary.currentYear} {labels.currentYtd} <strong>{currentValue}</strong></span>
+          <span>{labels.asOf} {currentDate}</span>
+          <span>{labels.high} {recordHigh}</span>
+          <span>{labels.low} {recordLow}</span>
         </div>
         <div className="section-actions">
           <a className="button subtle" href={withBaseUrl(`raw/${dataset.rawFile}`)} download>
-            Raw data
+            {labels.rawData}
           </a>
           <button className="button" onClick={() => downloadNormalizedCsv(dataset)}>
-            Normalized CSV
+            {labels.normalizedCsv}
+          </button>
+          <button className="button" onClick={() => void handleDownloadCard()}>
+            ↓
           </button>
         </div>
       </div>
@@ -88,21 +181,28 @@ function ChartSection({ dataset }: { dataset: CommodityDataset }) {
 
       <div className="section-footer">
         <span>
-          Source: <a href={dataset.sourceUrl} target="_blank" rel="noreferrer">{dataset.sourceName}</a>
+          {labels.source}: <a href={dataset.sourceUrl} target="_blank" rel="noreferrer">{dataset.sourceName}</a>
         </span>
-        <span>Coverage: {summary.startYear} to {summary.endYear}</span>
+        <span>{labels.coverage}: {summary.startYear} to {summary.endYear}</span>
       </div>
     </section>
   );
 }
 
 export default function App() {
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [locale, setLocale] = useState<Locale>("es");
+  const [data, setData] = useState<CommoditiesPayload | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const labels = copy[locale];
 
   const loadData = async (forceRefresh = false) => {
-    if (state.status === "ready") {
+    if (forceRefresh && data) {
       setIsRefreshing(true);
+      setRefreshError(null);
+    } else if (!data) {
+      setLoadError(null);
     }
 
     try {
@@ -120,10 +220,16 @@ export default function App() {
       }
 
       const data = await response.json() as CommoditiesPayload;
-      setState({ status: "ready", data });
+      setData(data);
+      setLoadError(null);
+      setRefreshError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setState({ status: "error", message });
+      if (data) {
+        setRefreshError(message);
+      } else {
+        setLoadError(message);
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -133,24 +239,25 @@ export default function App() {
     void loadData();
   }, []);
 
-  if (state.status === "loading") {
-    return <main className="app-shell"><div className="panel status-panel">Loading dashboard...</div></main>;
+  if (!data && !loadError) {
+    return <main className="app-shell"><div className="panel status-panel">{labels.loading}</div></main>;
   }
 
-  if (state.status === "error") {
+  if (!data && loadError) {
     return (
       <main className="app-shell">
         <div className="panel status-panel">
-          Could not load the generated dataset. Run <code>npm run build:data</code> and then start the Vite server.
+          {labels.loadErrorLead} <code>npm run build:data</code> {labels.loadErrorTail}
           <br />
-          Error: {state.message}
+          {labels.error}: {loadError}
         </div>
       </main>
     );
   }
 
-  const { oil, gold, sp500, ipsa } = state.data;
-  const generatedAt = new Date(state.data.generatedAt).toLocaleString("en-US", {
+  const payload = data!;
+  const { oil, gold, sp500, ipsa } = payload;
+  const generatedAt = new Date(payload.generatedAt).toLocaleString(locale === "es" ? "es-CL" : "en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -165,26 +272,33 @@ export default function App() {
         <div className="methodology-inline">
           <div className="methodology-topline">
             <div className="methodology-meta">
-              <span className="methodology-chip">Methodology:</span>
-              <span className="generated-at">Updated {generatedAt}</span>
+              <span className="methodology-chip">{labels.methodology}</span>
+              <span className="generated-at">{labels.updated} {generatedAt}</span>
             </div>
             <div className="methodology-controls">
+              <div className="language-switch" aria-label={labels.language}>
+                <button className={`button subtle ${locale === "es" ? "active" : ""}`} onClick={() => setLocale("es")} type="button">
+                  ES
+                </button>
+                <button className={`button subtle ${locale === "en" ? "active" : ""}`} onClick={() => setLocale("en")} type="button">
+                  EN
+                </button>
+              </div>
               <button className="button subtle" onClick={() => void loadData(true)} disabled={isRefreshing}>
-                {isRefreshing ? "Updating..." : "Update"}
+                {isRefreshing ? labels.reloading : labels.reload}
               </button>
             </div>
           </div>
+          {refreshError ? (
+            <div className="refresh-warning" role="status">
+              {labels.reloadFailed} {labels.error}: {refreshError}
+            </div>
+          ) : null}
           <span className="methodology-copy">
-            each line represents one calendar year. Here, “normalized” means that the first valid trading observation of
-            the year is used as the common base level, so every subsequent point is shown as the cumulative percentage
-            change relative to that starting value rather than as an absolute price. The x-axis is trading-day count, not
-            calendar date, so the observation on day 40 of one year is directly comparable with day 40 of any other year.
-            The colored line is the current year, while the grey lines represent the empirical distribution of prior-year
-            paths, allowing current performance to be evaluated against the historical range of rallies and drawdowns
-            observed at the same stage of the annual cycle. In the formula, <InlineMath math={"y"} /> denotes calendar
-            year, <InlineMath math={"d"} /> denotes trading-day index within that year, <InlineMath math={"P(y,d)"} />
-            {" "}denotes the observed asset price on trading day <InlineMath math={"d"} />, and{" "}
-            <InlineMath math={"P(y,1)"} /> denotes the first valid trading observation of year <InlineMath math={"y"} />.
+            {labels.methodologyText} <InlineMath math={"y"} /> {locale === "es" ? "denota ano calendario," : "denotes calendar year,"}{" "}
+            <InlineMath math={"d"} /> {locale === "es" ? "denota indice de trading dentro de ese ano," : "denotes trading-day index within that year,"}{" "}
+            <InlineMath math={"P(y,d)"} /> {labels.methodologyTextTail} <InlineMath math={"d"} />, {labels.methodologyTextTail2}{" "}
+            <InlineMath math={"P(y,1)"} /> {labels.methodologyTextTail3} <InlineMath math={"y"} />.
           </span>
           <div className="formula-inline methodology-formula methodology-formula-break" aria-label="YTD formula">
             <span className="formula-roman">YTD</span>
@@ -209,10 +323,10 @@ export default function App() {
         </div>
       </section>
       <section className="chart-grid">
-        <ChartSection dataset={oil} />
-        <ChartSection dataset={gold} />
-        <ChartSection dataset={sp500} />
-        <ChartSection dataset={ipsa} />
+        <ChartSection dataset={oil} locale={locale} />
+        <ChartSection dataset={gold} locale={locale} />
+        <ChartSection dataset={sp500} locale={locale} />
+        <ChartSection dataset={ipsa} locale={locale} />
       </section>
     </main>
   );

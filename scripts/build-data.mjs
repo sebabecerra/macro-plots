@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +15,7 @@ const period2 = Math.floor(Date.now() / 1000) + 86400;
 const SERIES_CONFIG = [
   {
     key: "oil",
+    sourceType: "yahoo",
     ticker: "CL=F",
     name: "WTI Crude Oil",
     unit: "USD per barrel",
@@ -24,6 +25,7 @@ const SERIES_CONFIG = [
   },
   {
     key: "gold",
+    sourceType: "yahoo",
     ticker: "GC=F",
     name: "Gold Futures",
     unit: "USD per troy ounce",
@@ -33,6 +35,7 @@ const SERIES_CONFIG = [
   },
   {
     key: "sp500",
+    sourceType: "yahoo",
     ticker: "^GSPC",
     name: "S&P 500",
     unit: "Index level",
@@ -42,12 +45,13 @@ const SERIES_CONFIG = [
   },
   {
     key: "ipsa",
-    ticker: "^IPSA",
+    sourceType: "bcentral",
     name: "S&P IPSA",
     unit: "Index level",
-    sourceName: "Yahoo Finance",
-    sourceUrl: "https://finance.yahoo.com/quote/%5EIPSA/history",
-    rawFile: "ipsa-yahoo.csv",
+    sourceName: "Banco Central de Chile",
+    sourceUrl: "https://si3.bcentral.cl/siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_INDBUR?idSerie=F013.IBC.IND.N.7.LAC.CL.CLP.BLO.D",
+    rawFile: "ipsa-bcentral.csv",
+    seriesId: "F013.IBC.IND.N.7.LAC.CL.CLP.BLO.D",
   },
 ];
 
@@ -107,11 +111,122 @@ async function fetchYahooSeries({ ticker }) {
     .filter((row) => row.date && Number.isFinite(row.price) && row.price > 0);
 }
 
+function formatBcentralDate(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseBcentralDate(value) {
+  const [day, month, year] = value.split("-");
+  return `${year}-${month}-${day}`;
+}
+
+async function fetchBcentralSeries({ seriesId }) {
+  const user = process.env.BCCH_USER;
+  const pass = process.env.BCCH_PASS;
+
+  if (!user || !pass) {
+    throw new Error("BCCH_USER/BCCH_PASS are required to fetch IPSA from Banco Central de Chile.");
+  }
+
+  const url = new URL("https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx");
+  url.searchParams.set("user", user);
+  url.searchParams.set("pass", pass);
+  url.searchParams.set("timeseries", seriesId);
+  url.searchParams.set("firstdate", formatBcentralDate(startDate));
+  url.searchParams.set("lastdate", formatBcentralDate(new Date()));
+  url.searchParams.set("function", "GetSeries");
+
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "macro-plots/1.0",
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Banco Central request failed for ${seriesId}: HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (payload?.Codigo !== 0) {
+    throw new Error(`Banco Central returned Codigo=${payload?.Codigo}: ${payload?.Descripcion ?? "Unknown error"}`);
+  }
+
+  const observations = payload?.Series?.Obs ?? [];
+  if (!observations.length) {
+    throw new Error(`Banco Central returned no usable data for ${seriesId}.`);
+  }
+
+  return observations
+    .map((entry) => ({
+      date: parseBcentralDate(entry.indexDateString),
+      price: Number(entry.value),
+    }))
+    .filter((row) => row.date && Number.isFinite(row.price) && row.price > 0);
+}
+
 function toRawCsv(rows) {
   return [
     "date,price",
     ...rows.map((row) => `${row.date},${round4(row.price)}`),
   ].join("\n");
+}
+
+function daysBetween(a, b) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / msPerDay);
+}
+
+function dropBrokenTailSegment(rows) {
+  if (rows.length < 2) return rows;
+
+  let lastGapIndex = -1;
+  for (let index = 1; index < rows.length; index += 1) {
+    if (daysBetween(rows[index - 1].date, rows[index].date) > 120) {
+      lastGapIndex = index;
+    }
+  }
+
+  if (lastGapIndex === -1) return rows;
+
+  const trailingSegment = rows.slice(lastGapIndex);
+  if (trailingSegment.length >= 30) return rows;
+
+  console.warn(
+    `Dropping anomalous trailing segment from ${trailingSegment[0].date} to ${trailingSegment.at(-1).date} (${trailingSegment.length} rows) after a large data gap.`,
+  );
+  return rows.slice(0, lastGapIndex);
+}
+
+function parseRawCsv(csvText) {
+  const [header, ...lines] = csvText.trim().split(/\r?\n/);
+  if (header !== "date,price") {
+    throw new Error("Unexpected CSV header in local raw snapshot.");
+  }
+
+  return lines
+    .map((line) => {
+      const [date, rawPrice] = line.split(",");
+      return {
+        date,
+        price: Number(rawPrice),
+      };
+    })
+    .filter((row) => row.date && Number.isFinite(row.price) && row.price > 0);
+}
+
+async function loadLocalRawSeries(rawFile) {
+  const localPath = resolve(rawOutputDir, rawFile);
+  await access(localPath);
+  const csvText = await readFile(localPath, "utf8");
+  const rows = parseRawCsv(csvText);
+  if (!rows.length) {
+    throw new Error(`Local raw snapshot ${rawFile} did not contain any usable rows.`);
+  }
+  return rows;
 }
 
 function buildSeries(rows, minYear) {
@@ -195,11 +310,31 @@ function buildDatasetSummary(label, series) {
 
 const downloaded = await Promise.all(
   SERIES_CONFIG.map(async (config) => {
-    const rows = await fetchYahooSeries(config);
-    const series = buildSeries(rows, MIN_YEAR);
+    let rows;
+
+    try {
+      rows = config.sourceType === "bcentral"
+        ? await fetchBcentralSeries(config)
+        : await fetchYahooSeries(config);
+    } catch (error) {
+      try {
+        rows = await loadLocalRawSeries(config.rawFile);
+        const message = error instanceof Error ? error.message : String(error);
+        const sourceLabel = config.sourceType === "bcentral" ? config.seriesId : config.ticker;
+        console.warn(`Falling back to local snapshot for ${sourceLabel}: ${message}`);
+      } catch (fallbackError) {
+        const primaryMessage = error instanceof Error ? error.message : String(error);
+        const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        const sourceLabel = config.sourceType === "bcentral" ? config.seriesId : config.ticker;
+        throw new Error(`Failed to fetch ${sourceLabel} and no local fallback was usable. Fetch error: ${primaryMessage}. Fallback error: ${fallbackMessage}`);
+      }
+    }
+
+    const cleanedRows = dropBrokenTailSegment(rows);
+    const series = buildSeries(cleanedRows, MIN_YEAR);
     return {
       ...config,
-      rows,
+      rows: cleanedRows,
       series,
     };
   }),
