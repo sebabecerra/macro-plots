@@ -40,6 +40,15 @@ const SERIES_CONFIG = [
     sourceUrl: "https://finance.yahoo.com/quote/%5EGSPC/history",
     rawFile: "sp500-yahoo.csv",
   },
+  {
+    key: "ipsa",
+    ticker: "^IPSA",
+    name: "S&P IPSA",
+    unit: "Index level",
+    sourceName: "Yahoo Finance",
+    sourceUrl: "https://finance.yahoo.com/quote/%5EIPSA/history",
+    rawFile: "ipsa-yahoo.csv",
+  },
 ];
 
 function round2(value) {
@@ -227,6 +236,16 @@ const payload = {
     rawFile: downloaded[2].rawFile,
     summary: buildDatasetSummary("sp500", downloaded[2].series),
     series: downloaded[2].series,
+  },
+  ipsa: {
+    key: "ipsa",
+    name: downloaded[3].name,
+    unit: downloaded[3].unit,
+    sourceName: downloaded[3].sourceName,
+    sourceUrl: downloaded[3].sourceUrl,
+    rawFile: downloaded[3].rawFile,
+    summary: buildDatasetSummary("ipsa", downloaded[3].series),
+    series: downloaded[3].series,
   },
 };
 

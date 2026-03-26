@@ -12,6 +12,7 @@ const accents = {
   oil: "#ffd166",
   gold: "#ffd166",
   sp500: "#ffd166",
+  ipsa: "#ffd166",
 };
 
 function withBaseUrl(path: string) {
@@ -148,7 +149,7 @@ export default function App() {
     );
   }
 
-  const { oil, gold, sp500 } = state.data;
+  const { oil, gold, sp500, ipsa } = state.data;
   const generatedAt = new Date(state.data.generatedAt).toLocaleString("en-US", {
     year: "numeric",
     month: "short",
@@ -211,6 +212,7 @@ export default function App() {
         <ChartSection dataset={oil} />
         <ChartSection dataset={gold} />
         <ChartSection dataset={sp500} />
+        <ChartSection dataset={ipsa} />
       </section>
     </main>
   );

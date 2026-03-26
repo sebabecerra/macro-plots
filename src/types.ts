@@ -26,7 +26,7 @@ export type CommoditySummary = {
 };
 
 export type CommodityDataset = {
-  key: "oil" | "gold" | "sp500";
+  key: "oil" | "gold" | "sp500" | "ipsa";
   name: string;
   unit: string;
   sourceName: string;
@@ -41,4 +41,5 @@ export type CommoditiesPayload = {
   oil: CommodityDataset;
   gold: CommodityDataset;
   sp500: CommodityDataset;
+  ipsa: CommodityDataset;
 };
