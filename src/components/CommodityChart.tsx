@@ -5,7 +5,6 @@ import { LineChart } from "echarts/charts";
 import {
   GridComponent,
   LegendComponent,
-  ToolboxComponent,
   TooltipComponent,
 } from "echarts/components";
 import { init, use } from "echarts/core";
@@ -17,7 +16,6 @@ use([
   LineChart,
   GridComponent,
   LegendComponent,
-  ToolboxComponent,
   TooltipComponent,
 ]);
 
@@ -100,21 +98,6 @@ export default function CommodityChart({ dataset, accent }: Props) {
             `${formatHoverDate(date)}`,
             `Value ${formatPrice(price)}`,
           ].join("<br/>");
-        },
-      },
-      toolbox: {
-        top: -2,
-        right: 2,
-        itemSize: 12,
-        iconStyle: {
-          borderColor: "rgba(220,220,220,0.7)",
-        },
-        feature: {
-          saveAsImage: {
-            name: `${dataset.key}-ytd-by-year`,
-            pixelRatio: 2,
-            backgroundColor: "#070707",
-          },
         },
       },
       xAxis: {

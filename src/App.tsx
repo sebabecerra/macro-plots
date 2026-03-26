@@ -161,8 +161,8 @@ function ChartSection({ dataset, locale }: { dataset: CommodityDataset; locale: 
         <div className="section-statline">
           <span>{summary.currentYear} {labels.currentYtd} <strong>{currentValue}</strong></span>
           <span>{labels.asOf} {currentDate}</span>
-          <span>{labels.high} {recordHigh}</span>
           <span>{labels.low} {recordLow}</span>
+          <span>{labels.high} {recordHigh}</span>
         </div>
         <div className="section-actions">
           <a className="button subtle" href={withBaseUrl(`raw/${dataset.rawFile}`)} download>
