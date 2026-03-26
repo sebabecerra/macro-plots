@@ -184,7 +184,7 @@ p {
 }
 
 .section-card {
-  padding: 8px 10px 6px;
+  padding: 6px 10px 6px;
   max-width: none;
 }
 
@@ -193,8 +193,8 @@ p {
   grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1.8fr) auto;
   gap: 8px 14px;
   align-items: start;
-  margin-bottom: 4px;
-  padding: 2px 2px 0;
+  margin-bottom: 2px;
+  padding: 0 2px;
 }
 
 .section-kicker {
@@ -202,7 +202,7 @@ p {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 9px;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   font-weight: 700;
 }
 
@@ -214,36 +214,50 @@ p {
   font-size: 16px;
   line-height: 1;
   letter-spacing: -0.02em;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   font-weight: 700;
 }
 
 .section-actions {
   display: grid;
-  grid-template-columns: repeat(3, max-content);
-  gap: 6px;
-  justify-content: flex-end;
+  grid-template-columns: repeat(2, max-content);
   align-items: start;
+  gap: 6px;
+  justify-content: end;
+}
+
+.section-actions .button:last-child {
+  grid-column: 2;
+  justify-self: end;
 }
 
 .section-statline {
   display: grid;
   grid-template-columns: repeat(2, max-content);
   column-gap: 18px;
-  row-gap: 6px;
+  row-gap: 4px;
   align-items: start;
   justify-content: start;
   color: rgba(220, 220, 220, 0.82);
-  font-size: 10px;
-  line-height: 1.2;
-  padding-top: 2px;
+  font-size: 14px;
+  line-height: 1.25;
+  padding-top: 10px;
   min-width: 0;
 }
 
 .section-statline strong {
-  color: #fff;
-  font-size: 12px;
-  margin-left: 4px;
+  color: inherit;
+  font-size: inherit;
+  margin-left: 0;
+  font-weight: 700;
+}
+
+.section-statline strong.positive {
+  color: #7bff9d;
+}
+
+.section-statline strong.negative {
+  color: #ff7b7b;
 }
 
 .button {
@@ -283,7 +297,7 @@ p {
 
 .chart-canvas {
   width: 100%;
-  height: 390px;
+  height: 378px;
 }
 
 .section-footer {

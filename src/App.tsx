@@ -91,6 +91,11 @@ function formatPct(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
+function pctToneClass(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value) || value === 0) return "";
+  return value > 0 ? "positive" : "negative";
+}
+
 function formatDate(date: string, locale: Locale) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(locale === "es" ? "es-CL" : "en-US", {
     year: "numeric",
@@ -142,6 +147,7 @@ function ChartSection({ dataset, locale }: { dataset: CommodityDataset; locale: 
   const labels = copy[locale];
   const datasetLabels = localizedDatasets[locale][dataset.key];
   const currentValue = formatPct(summary.currentChangePct);
+  const currentValueTone = pctToneClass(summary.currentChangePct);
   const recordHigh = formatPct(summary.recordHigh?.changePct);
   const recordLow = formatPct(summary.recordLow?.changePct);
   const currentDate = formatDate(summary.currentDate, locale);
@@ -159,7 +165,7 @@ function ChartSection({ dataset, locale }: { dataset: CommodityDataset; locale: 
           <p>{datasetLabels.unit}</p>
         </div>
         <div className="section-statline">
-          <span>{summary.currentYear} {labels.currentYtd} <strong>{currentValue}</strong></span>
+          <span>{summary.currentYear} {labels.currentYtd} <strong className={currentValueTone}>{currentValue}</strong></span>
           <span>{labels.asOf} {currentDate}</span>
           <span>{labels.low} {recordLow}</span>
           <span>{labels.high} {recordHigh}</span>
