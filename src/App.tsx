@@ -36,9 +36,6 @@ const copy = {
     error: "Error",
     methodology: "Methodology:",
     updated: "Updated",
-    reload: "Reload dataset",
-    reloading: "Reloading...",
-    reloadFailed: "Reload failed. Showing the last generated dataset.",
     currentYtd: "YTD",
     asOf: "As of",
     high: "High",
@@ -60,9 +57,6 @@ const copy = {
     error: "Error",
     methodology: "Metodologia:",
     updated: "Actualizado",
-    reload: "Recargar dataset",
-    reloading: "Recargando...",
-    reloadFailed: "La recarga fallo. Se muestra el ultimo dataset generado.",
     currentYtd: "YTD",
     asOf: "Al",
     high: "Maximo",
@@ -199,27 +193,16 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>("es");
   const [data, setData] = useState<CommoditiesPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const labels = copy[locale];
 
-  const loadData = async (forceRefresh = false) => {
-    if (forceRefresh && data) {
-      setIsRefreshing(true);
-      setRefreshError(null);
-    } else if (!data) {
+  const loadData = async () => {
+    if (!data) {
       setLoadError(null);
     }
 
     try {
       const url = new URL(withBaseUrl("data/commodities.json"), window.location.origin);
-      if (forceRefresh) {
-        url.searchParams.set("t", String(Date.now()));
-      }
-
-      const response = await fetch(url.toString(), {
-        cache: forceRefresh ? "no-store" : "default",
-      });
+      const response = await fetch(url.toString());
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -228,16 +211,9 @@ export default function App() {
       const data = await response.json() as CommoditiesPayload;
       setData(data);
       setLoadError(null);
-      setRefreshError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (data) {
-        setRefreshError(message);
-      } else {
-        setLoadError(message);
-      }
-    } finally {
-      setIsRefreshing(false);
+      setLoadError(message);
     }
   };
 
@@ -290,16 +266,8 @@ export default function App() {
                   EN
                 </button>
               </div>
-              <button className="button subtle" onClick={() => void loadData(true)} disabled={isRefreshing}>
-                {isRefreshing ? labels.reloading : labels.reload}
-              </button>
             </div>
           </div>
-          {refreshError ? (
-            <div className="refresh-warning" role="status">
-              {labels.reloadFailed} {labels.error}: {refreshError}
-            </div>
-          ) : null}
           <span className="methodology-copy">
             {labels.methodologyText} <InlineMath math={"y"} /> {locale === "es" ? "denota ano calendario," : "denotes calendar year,"}{" "}
             <InlineMath math={"d"} /> {locale === "es" ? "denota indice de trading dentro de ese ano," : "denotes trading-day index within that year,"}{" "}

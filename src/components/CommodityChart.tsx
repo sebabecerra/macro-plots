@@ -46,7 +46,15 @@ export default function CommodityChart({ dataset, accent }: Props) {
 
     const chart: EChartsType = init(ref.current, undefined, { renderer: "canvas" });
     const currentYear = dataset.summary.currentYear;
+    const currentSeriesIndex = dataset.series.findIndex((entry) => entry.year === currentYear);
     let lastMouseY = 0;
+    let animationFrame = 0;
+    let animationTimeout: number | undefined;
+
+    const allSeriesData = dataset.series.map((entry) =>
+      entry.points.map((point) => [point.day, point.changePct, point.date, point.price]),
+    );
+
     const option: EChartsOption = {
       animation: false,
       backgroundColor: "transparent",
@@ -131,7 +139,8 @@ export default function CommodityChart({ dataset, accent }: Props) {
         const isCurrent = entry.year === currentYear;
         const lineWidth = isCurrent ? 3.25 : 1.1;
         const color = isCurrent ? accent : "rgba(255,255,255,0.22)";
-        const data = entry.points.map((point) => [point.day, point.changePct, point.date, point.price]);
+        const fullData = allSeriesData.find((_, index) => dataset.series[index].year === entry.year) ?? [];
+        const data = isCurrent ? fullData.slice(0, 1) : fullData;
 
         return {
           name: String(entry.year),
@@ -150,6 +159,35 @@ export default function CommodityChart({ dataset, accent }: Props) {
     };
 
     chart.setOption(option);
+
+    if (currentSeriesIndex >= 0) {
+      const currentData = allSeriesData[currentSeriesIndex];
+      const totalPoints = currentData.length;
+      const start = performance.now();
+      const duration = 1800;
+
+      const animateCurrentSeries = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const visiblePoints = Math.max(1, Math.ceil(progress * totalPoints));
+
+        chart.setOption({
+          series: dataset.series.map((entry, index) => (
+            index === currentSeriesIndex
+              ? { name: String(entry.year), data: currentData.slice(0, visiblePoints) }
+              : { name: String(entry.year) }
+          )),
+        });
+
+        if (progress < 1) {
+          animationFrame = window.requestAnimationFrame(animateCurrentSeries);
+        }
+      };
+
+      animationTimeout = window.setTimeout(() => {
+        animationFrame = window.requestAnimationFrame(animateCurrentSeries);
+      }, 80);
+    }
+
     const zr = chart.getZr();
     const handleMouseMove = (event: { offsetY: number }) => {
       lastMouseY = event.offsetY;
@@ -159,6 +197,12 @@ export default function CommodityChart({ dataset, accent }: Props) {
     resizeObserver.observe(ref.current);
 
     return () => {
+      if (animationTimeout) {
+        window.clearTimeout(animationTimeout);
+      }
+      if (animationFrame) {
+        window.cancelAnimationFrame(animationFrame);
+      }
       zr.off("mousemove", handleMouseMove);
       resizeObserver.disconnect();
       chart.dispose();
