@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { InlineMath } from "react-katex";
-import { toBlob } from "html-to-image";
-import CommodityChart from "./components/CommodityChart";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { CommodityDataset, CommoditiesPayload } from "./types";
+
+const CommodityChart = lazy(() => import("./components/CommodityChart"));
 
 type Locale = "en" | "es";
 
@@ -116,6 +115,7 @@ function downloadNormalizedCsv(dataset: CommodityDataset) {
 }
 
 async function downloadCardPng(node: HTMLElement, filename: string) {
+  const { toBlob } = await import("html-to-image");
   const blob = await toBlob(node, {
     cacheBust: true,
     pixelRatio: 2,
@@ -177,7 +177,9 @@ function ChartSection({ dataset, locale }: { dataset: CommodityDataset; locale: 
         </div>
       </div>
 
-      <CommodityChart dataset={dataset} accent={accent} />
+      <Suspense fallback={<div className="chart-canvas chart-canvas-loading" />}>
+        <CommodityChart dataset={dataset} accent={accent} />
+      </Suspense>
 
       <div className="section-footer">
         <span>
@@ -252,47 +254,52 @@ export default function App() {
     <main className="app-shell">
       <section className="panel methodology-card">
         <div className="methodology-inline">
-          <div className="methodology-topline">
-            <div className="methodology-meta">
-              <span className="methodology-chip">{labels.methodology}</span>
-              <span className="generated-at">{labels.updated} {generatedAt}</span>
-            </div>
-            <div className="methodology-controls">
-              <div className="language-switch" aria-label={labels.language}>
-                <button className={`button subtle ${locale === "es" ? "active" : ""}`} onClick={() => setLocale("es")} type="button">
-                  ES
-                </button>
-                <button className={`button subtle ${locale === "en" ? "active" : ""}`} onClick={() => setLocale("en")} type="button">
-                  EN
-                </button>
+          <div className="methodology-main">
+            <div className="methodology-topline">
+              <div className="methodology-brand">
+                <div className="methodology-meta">
+                  <span className="methodology-chip">{labels.methodology}</span>
+                  <span className="generated-at">{labels.updated} {generatedAt}</span>
+                </div>
               </div>
             </div>
+            <span className="methodology-copy">
+              {labels.methodologyText} <span className="formula-var">y</span> {locale === "es" ? "denota ano calendario," : "denotes calendar year,"}{" "}
+              <span className="formula-var">d</span> {locale === "es" ? "denota indice de trading dentro de ese ano," : "denotes trading-day index within that year,"}{" "}
+              <span className="formula-inline-text">P(y,d)</span> {labels.methodologyTextTail} <span className="formula-var">d</span>, {labels.methodologyTextTail2}{" "}
+              <span className="formula-inline-text">P(y,1)</span> {labels.methodologyTextTail3} <span className="formula-var">y</span>.
+            </span>
+            <div className="formula-inline methodology-formula methodology-formula-break" aria-label="YTD formula">
+              <span className="formula-roman">YTD</span>
+              <span>(</span>
+              <span className="formula-var">y</span>
+              <span>, </span>
+              <span className="formula-var">d</span>
+              <span>) = 100 </span>
+              <span className="formula-group">(</span>
+              <span className="formula-symbol">P</span>
+              <span>(</span>
+              <span className="formula-var">y</span>
+              <span>, </span>
+              <span className="formula-var">d</span>
+              <span>) / </span>
+              <span className="formula-symbol">P</span>
+              <span>(</span>
+              <span className="formula-var">y</span>
+              <span>, 1) - 1</span>
+              <span className="formula-group">)</span>
+            </div>
           </div>
-          <span className="methodology-copy">
-            {labels.methodologyText} <InlineMath math={"y"} /> {locale === "es" ? "denota ano calendario," : "denotes calendar year,"}{" "}
-            <InlineMath math={"d"} /> {locale === "es" ? "denota indice de trading dentro de ese ano," : "denotes trading-day index within that year,"}{" "}
-            <InlineMath math={"P(y,d)"} /> {labels.methodologyTextTail} <InlineMath math={"d"} />, {labels.methodologyTextTail2}{" "}
-            <InlineMath math={"P(y,1)"} /> {labels.methodologyTextTail3} <InlineMath math={"y"} />.
-          </span>
-          <div className="formula-inline methodology-formula methodology-formula-break" aria-label="YTD formula">
-            <span className="formula-roman">YTD</span>
-            <span>(</span>
-            <span className="formula-var">y</span>
-            <span>, </span>
-            <span className="formula-var">d</span>
-            <span>) = 100 </span>
-            <span className="formula-group">(</span>
-            <span className="formula-symbol">P</span>
-            <span>(</span>
-            <span className="formula-var">y</span>
-            <span>, </span>
-            <span className="formula-var">d</span>
-            <span>) / </span>
-            <span className="formula-symbol">P</span>
-            <span>(</span>
-            <span className="formula-var">y</span>
-            <span>, 1) - 1</span>
-            <span className="formula-group">)</span>
+          <div className="methodology-controls">
+            <div className="language-switch" aria-label={labels.language}>
+              <button className={`button subtle ${locale === "es" ? "active" : ""}`} onClick={() => setLocale("es")} type="button">
+                ES
+              </button>
+              <button className={`button subtle ${locale === "en" ? "active" : ""}`} onClick={() => setLocale("en")} type="button">
+                EN
+              </button>
+            </div>
+            <img className="app-logo app-logo-controls" src={withBaseUrl("logo_clean.png")} alt="Macro Plots logo" />
           </div>
         </div>
       </section>

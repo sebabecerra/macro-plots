@@ -1,6 +1,9 @@
 node_modules/
 dist/
 *.tsbuildinfo
+.env
+.env.*
+!.env.example
 
 # local raw/source artifacts not needed in most commits
 DCOILWTICO.txt
